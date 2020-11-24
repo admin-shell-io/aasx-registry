@@ -410,7 +410,7 @@ namespace AasxRegistryStandardBib
             {
                 // Host = "localhost",
                 Host = "admin-shell-io.com",
-                Port = "52002",
+                Port = "52001",
                 UseHttps = false
             };
             RestServer rs = new RestServer(serverSettings);
