@@ -5,6 +5,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Threading;
 using AasxConnect;
 using Grapevine.Core.Interfaces.Server;
@@ -159,13 +160,88 @@ namespace AasxRegistryStandardBib
 
             if (getAasxFileData != "")
             {
-                /*
-                string payload = "{ \"file\" : \" " + getAasxFileData + " \" }";
+                res.fileName = getAasxFileName;
+                res.fileData = getAasxFileData;
+            }
 
-                System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
-                string fileToken = Jose.JWT.Encode(payload, enc.GetBytes(Connect.secretString), JwsAlgorithm.HS256);
-                */
+            string responseJson = JsonConvert.SerializeObject(res, Formatting.Indented);
 
+            context.Response.ContentType = ContentType.JSON;
+            context.Response.ContentEncoding = System.Text.Encoding.UTF8;
+            context.Response.ContentLength64 = responseJson.Length;
+            context.Response.SendResponse(responseJson);
+        }
+
+        [RestRoute(HttpMethod = Grapevine.Core.Shared.HttpMethod.GET, PathInfo = @"^/server/aasxbyasset/([^/]+)(/|)$")]
+        public IHttpContext GetAASX2ByAssetId(IHttpContext context)
+        {
+            GetAasxByAssetId(context);
+            return context;
+        }
+
+        public static void GetAasxByAssetId(IHttpContext context)
+        {
+            string ret = "ERROR";
+            dynamic res = new ExpandoObject();
+
+            string path = context.Request.PathInfo;
+            string[] split = path.Split('/');
+            string node = split[2];
+            string assetId = split[3];
+
+            string headers = context.Request.Headers.ToString();
+            string token = context.Request.Headers.Get("accept");
+            if (token == null || token != "application/aas")
+            {
+                // Human by browser
+                context.Response.ContentType = ContentType.TEXT;
+                context.Response.ContentEncoding = System.Text.Encoding.UTF8;
+                context.Response.SendResponse(
+                    "This is the human readable page for your asset.\n" +
+                    "AssetID = " + assetId
+                    );
+                return;
+            }
+
+            // I40 client
+            while (getAasxStatus != "") // earlier Download pending
+            {
+                System.Threading.Thread.Sleep(1000);
+            }
+            getAasxServerName = "";
+            getAasxServerIndex = 0;
+            getAasxFileName = "";
+            getAasxFileData = "";
+
+            if (Program.aasDirectory.Count > 0)
+            {
+                foreach (var server in Program.aasDirectory)
+                {
+                    foreach (var aas in server.aasList)
+                    {
+                        string url = WebUtility.UrlEncode(aas.assetId);
+                        if (assetId == url)
+                        {
+                            getAasxServerName = server.source;
+                            getAasxServerIndex = aas.index;
+                        }
+                    }
+                }
+            }
+
+            if (getAasxServerName != "")
+            {
+                getAasxStatus = "start";
+                while (getAasxStatus != "end") // wait for Download
+                {
+                    System.Threading.Thread.Sleep(1000);
+                }
+
+                getAasxStatus = "";
+            }
+
+            if (getAasxFileData != "")
+            {
                 res.fileName = getAasxFileName;
                 res.fileData = getAasxFileData;
             }
@@ -197,6 +273,8 @@ namespace AasxRegistryStandardBib
             public string identification;
             public string fileName;
             public string assetId;
+            public string humanEndPoint;
+            public string restEndPoint;
         }
         public class aasDirectoryParameters
         {
@@ -408,13 +486,18 @@ namespace AasxRegistryStandardBib
 
             var serverSettings = new ServerSettings
             {
-                // Host = "localhost",
-                Host = "admin-shell-io.com",
+                Host = "localhost",
+                // Host = "admin-shell-io.com",
                 Port = "52001",
                 UseHttps = false
             };
             RestServer rs = new RestServer(serverSettings);
             rs.Start();
+
+            Byte[] barray = new byte[10];
+            RNGCryptoServiceProvider rngCsp = new RNGCryptoServiceProvider();
+            rngCsp.GetBytes(barray);
+            connectNodeName = "AasxRegistry_" + Convert.ToBase64String(barray);
 
             connectLoop = true;
             connectThread = new Thread(new ThreadStart(connectThreadLoop));
