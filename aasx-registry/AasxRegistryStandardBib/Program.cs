@@ -486,8 +486,8 @@ namespace AasxRegistryStandardBib
 
             var serverSettings = new ServerSettings
             {
-                Host = "localhost",
-                // Host = "admin-shell-io.com",
+                // Host = "localhost",
+                Host = "admin-shell-io.com",
                 Port = "52001",
                 UseHttps = false
             };
