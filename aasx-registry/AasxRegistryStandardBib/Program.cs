@@ -187,7 +187,7 @@ namespace AasxRegistryStandardBib
             string path = context.Request.PathInfo;
             string[] split = path.Split('/');
             string node = split[2];
-            string assetId = split[3];
+            string assetId = split[3].ToUpper();
 
             string headers = context.Request.Headers.ToString();
             string token = context.Request.Headers.Get("accept");
@@ -219,7 +219,7 @@ namespace AasxRegistryStandardBib
                 {
                     foreach (var aas in server.aasList)
                     {
-                        string url = WebUtility.UrlEncode(aas.assetId);
+                        string url = WebUtility.UrlEncode(aas.assetId).ToUpper();
                         if (assetId == url)
                         {
                             getAasxServerName = server.source;
