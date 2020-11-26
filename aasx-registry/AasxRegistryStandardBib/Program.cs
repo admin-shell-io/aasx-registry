@@ -53,6 +53,7 @@ namespace AasxRegistryStandardBib
             context.Response.ContentType = ContentType.TEXT;
             context.Response.ContentEncoding = System.Text.Encoding.UTF8;
             context.Response.SendResponse("OK");
+            Console.WriteLine("Get Refresh");
         }
 
         [RestRoute(HttpMethod = Grapevine.Core.Shared.HttpMethod.GET, PathInfo = "^/server/listaas(/|)$")]
@@ -348,9 +349,10 @@ namespace AasxRegistryStandardBib
                     var result = httpClient.PostAsync(connectServer + "/publish", contentJson).Result;
                     content = Connect.ContentToString(result.Content);
                 }
-                catch
+                catch (Exception e)
                 {
-
+                    Console.WriteLine("Error Publish: " + e.Message);
+                    content = "";
                 }
 
                 if (content != "")
@@ -371,6 +373,7 @@ namespace AasxRegistryStandardBib
                             {
                                 case "directory":
                                     aasDirectoryParameters adp = new aasDirectoryParameters();
+                                    Console.WriteLine("Received directory: " + td2.source);
 
                                     try
                                     {
@@ -378,8 +381,11 @@ namespace AasxRegistryStandardBib
                                     }
                                     catch
                                     {
+                                        adp = null;
+                                        Console.WriteLine("Error receive directory");
                                     }
-                                    aasDirectory.Add(adp);
+                                    if (adp != null)
+                                        aasDirectory.Add(adp);
                                     tf.data.Remove(td2);
                                     break;
                                 case "getaasxFile":
@@ -401,8 +407,9 @@ namespace AasxRegistryStandardBib
                             }
                         }
                     }
-                    catch
+                    catch (Exception e)
                     {
+                        Console.WriteLine("Error receive");
                     }
                     if (newConnectData)
                     {
@@ -433,7 +440,7 @@ namespace AasxRegistryStandardBib
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
+                // AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
             }
 
             // default command line options
