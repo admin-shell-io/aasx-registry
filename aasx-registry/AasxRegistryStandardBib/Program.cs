@@ -45,7 +45,7 @@ namespace AasxRegistryStandardBib
             return context;
         }
 
-        public static bool refresh = false;
+        public static bool refresh = true;
         public static void Refresh(IHttpContext context)
         {
             refresh = true;
@@ -190,29 +190,11 @@ namespace AasxRegistryStandardBib
             string node = split[2];
             string assetId = split[3].ToUpper();
 
-            string headers = context.Request.Headers.ToString();
-            string token = context.Request.Headers.Get("accept");
-            if (token == null || token != "application/aas")
-            {
-                // Human by browser
-                context.Response.ContentType = ContentType.TEXT;
-                context.Response.ContentEncoding = System.Text.Encoding.UTF8;
-                context.Response.SendResponse(
-                    "This is the human readable page for your asset.\n" +
-                    "AssetID = " + assetId
-                    );
-                return;
-            }
-
-            // I40 client
-            while (getAasxStatus != "") // earlier Download pending
-            {
-                System.Threading.Thread.Sleep(1000);
-            }
             getAasxServerName = "";
             getAasxServerIndex = 0;
             getAasxFileName = "";
             getAasxFileData = "";
+            Program.aasListParameters aasFound = null;
 
             if (Program.aasDirectory.Count > 0)
             {
@@ -223,12 +205,44 @@ namespace AasxRegistryStandardBib
                         string url = WebUtility.UrlEncode(aas.assetId).ToUpper();
                         if (assetId == url)
                         {
+                            aasFound = aas;
                             getAasxServerName = server.source;
                             getAasxServerIndex = aas.index;
                         }
                     }
                 }
             }
+
+            string headers = context.Request.Headers.ToString();
+            string token = context.Request.Headers.Get("accept");
+            if (token == null || token != "application/aas")
+            {
+                // Human by browser
+                res.text = "This is the human readable page for your asset";
+                res.receivedID = "AssetID = " + assetId;
+
+                res.aasFound = aasFound;
+
+                res.hint = "Please open AAS in AASX Package Explorer by: File / Connect / Connect via REST: " + 
+                    "http://admin-shell-io.com:52001/server/aasxbyasset/" + assetId;
+                res.hint2 = "Please use Postman to get raw data: GET " +
+                    "http://admin-shell-io.com:52001/server/aasxbyasset/" + assetId +
+                    " and set Headers / Accept application/aas";
+
+                string responseJson2 = JsonConvert.SerializeObject(res, Formatting.Indented);
+
+                context.Response.ContentType = ContentType.JSON;
+                context.Response.ContentEncoding = System.Text.Encoding.UTF8;
+                context.Response.SendResponse(responseJson2);
+                return;
+            }
+
+            // I40 client
+            while (getAasxStatus != "") // earlier Download pending
+            {
+                System.Threading.Thread.Sleep(1000);
+            }
+
 
             if (getAasxServerName != "")
             {
@@ -372,21 +386,24 @@ namespace AasxRegistryStandardBib
                             switch (td2.type)
                             {
                                 case "directory":
-                                    aasDirectoryParameters adp = new aasDirectoryParameters();
-                                    Console.WriteLine("Received directory: " + td2.source);
+                                    if (td2.destination == connectNodeName)
+                                    {
+                                        aasDirectoryParameters adp = new aasDirectoryParameters();
+                                        Console.WriteLine("Received directory: " + td2.source);
 
-                                    try
-                                    {
-                                        adp = Newtonsoft.Json.JsonConvert.DeserializeObject<aasDirectoryParameters>(td2.publish[0]);
+                                        try
+                                        {
+                                            adp = Newtonsoft.Json.JsonConvert.DeserializeObject<aasDirectoryParameters>(td2.publish[0]);
+                                        }
+                                        catch
+                                        {
+                                            adp = null;
+                                            Console.WriteLine("Error receive directory");
+                                        }
+                                        if (adp != null)
+                                            aasDirectory.Add(adp);
+                                        tf.data.Remove(td2);
                                     }
-                                    catch
-                                    {
-                                        adp = null;
-                                        Console.WriteLine("Error receive directory");
-                                    }
-                                    if (adp != null)
-                                        aasDirectory.Add(adp);
-                                    tf.data.Remove(td2);
                                     break;
                                 case "getaasxFile":
                                     if (ConnectResource.getAasxStatus == "send" && td2.destination == connectNodeName && td2.source == ConnectResource.getAasxServerName)
