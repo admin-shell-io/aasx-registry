@@ -16,6 +16,10 @@ using Jose;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+/*
+Copyright (c) 2020 PHOENIX CONTACT GmbH & Co. KG <opensource@phoenixcontact.com>, author: Andreas Orzelski
+*/
+
 namespace AasxRegistryStandardBib
 {
     [RestResource]
