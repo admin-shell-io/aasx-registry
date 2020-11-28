@@ -4,7 +4,7 @@ The AASX Registry stores registry information from AASX Servers and other AAS se
 
 It allows to find AAS endpoints by AssetIDs.
 
-Set option "--connect" for your AASX Server and information of the AAS will be automatically transfered to AASX Registry by AASX Connect.http://admin-shell-io.com:52001r
+Set option "--connect" for your AASX Server and information of the AAS will be automatically transfered to AASX Registry by AASX Connect. 
 This also works when your AASX Server is running behind a proxy/firewall.
 
 An AASX Registry is running on http://admin-shell-io.com:52001.
