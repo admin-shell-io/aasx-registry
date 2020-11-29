@@ -218,6 +218,32 @@ namespace AasxRegistryStandardBib
             if (token == null || token != "application/aas")
             {
                 // Human by browser
+                string text = "";
+
+                text += "<strong>" + "This is the human readable page for your asset" + "</strong><br><br>";
+
+                text += "AssetID = " + assetId + "<br><br>";
+
+                text += "JSON entry in AASX Registry:<br>" +
+                    JsonConvert.SerializeObject(aasFound, Formatting.Indented) + "<br><br>";
+
+                string link = "http://admin-shell-io.com:52001/directory";
+                text += "View AASX Registry:<br>" +
+                    "<a href= \"" + link + "\" target=\"_blank\">" + 
+                    link + "</a>" + "<br><br>";
+
+                link = "http://admin-shell-io.com:52001/server/aasxbyasset/" + assetId;
+                text += "Please open AAS in AASX Package Explorer by: File / Connect / Connect via REST:<br>" +
+                    "<a href= \"" + link + "\" target=\"_blank\">" +
+                    link + "</a>" + "<br><br>";
+
+                link = "http://admin-shell-io.com:52001/server/aasxbyasset/"+ assetId;
+                text += "Please use Postman to get raw data:<br>GET " +
+                    "<a href= \"" + link + "\" target=\"_blank\">" +
+                    link + "</a>" + "<br>" +
+                "and set Headers / Accept application/aas" + "<br><br>";
+
+                /*
                 res.text = "This is the human readable page for your asset";
                 res.receivedID = "AssetID = " + assetId;
 
@@ -230,10 +256,13 @@ namespace AasxRegistryStandardBib
                     " and set Headers / Accept application/aas";
 
                 string responseJson2 = JsonConvert.SerializeObject(res, Formatting.Indented);
+                */
 
-                context.Response.ContentType = ContentType.JSON;
+                // context.Response.ContentType = ContentType.JSON;
+                context.Response.ContentType = ContentType.HTML;
                 context.Response.ContentEncoding = System.Text.Encoding.UTF8;
-                context.Response.SendResponse(responseJson2);
+                // context.Response.SendResponse(responseJson2);
+                context.Response.SendResponse(text);
                 return;
             }
 
