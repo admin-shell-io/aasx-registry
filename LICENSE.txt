@@ -14,8 +14,8 @@ Jose-JWT is licensed under the MIT license (MIT) (see below)
 --------------------------------------------------------------------------------------------------------------
 
 
-With respect to AASX Connect
-============================
+With respect to AASX Registry
+=============================
 
 (http://www.apache.org/licenses/LICENSE-2.0)
 
