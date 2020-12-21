@@ -435,7 +435,7 @@ namespace AasxRegistryStandardBib
                                         }
                                         if (adp != null)
                                             aasDirectory.Add(adp);
-                                        tf.data.Remove(td2);
+                                        // tf2.data.Remove(td2);
                                     }
                                     break;
                                 case "getaasxFile":
@@ -545,7 +545,7 @@ namespace AasxRegistryStandardBib
             {
                 // Host = "localhost",
                 Host = "admin-shell-io.com",
-                Port = "52001",
+                Port = "52002",
                 UseHttps = false
             };
             RestServer rs = new RestServer(serverSettings);
