@@ -342,6 +342,12 @@ namespace AasxRegistryStandardBib
 
         static int count = 0;
 
+        static string getaasxFile_destination = "";
+        static string getaasxFile_fileName = "";
+        static string getaasxFile_fileData = "";
+        static int getaasxFile_fileLen = 0;
+        static int getaasxFile_fileTransmitted = 0;
+
         public static void connectThreadLoop()
         {
             bool newConnectData = false;
@@ -454,6 +460,40 @@ namespace AasxRegistryStandardBib
                                         Console.WriteLine("Received: " + fileName);
                                     }
                                     break;
+                                case "getaasxBlock":
+                                    if (ConnectResource.getAasxStatus == "send" && td2.destination == connectNodeName && td2.source == ConnectResource.getAasxServerName)
+                                    {
+                                        var parsed3 = JObject.Parse(td2.publish[0]);
+
+                                        string fileName = parsed3.SelectToken("fileName").Value<string>();
+                                        string fileData = parsed3.SelectToken("fileData").Value<string>();
+                                        int fileLen = parsed3.SelectToken("fileLen").Value<int>();
+                                        int fileTransmitted = parsed3.SelectToken("fileTransmitted").Value<int>();
+                                        fileTransmitted += fileData.Length;
+                                        Console.WriteLine("Transmitted: " + fileTransmitted + "/" + fileLen);
+
+                                        if (getaasxFile_destination == "") // first block
+                                        {
+                                            getaasxFile_destination = connectNodeName;
+                                            getaasxFile_fileName = fileName;
+                                            getaasxFile_fileLen = fileLen;
+                                        }
+                                        getaasxFile_fileData += fileData;
+
+                                        if (fileTransmitted == fileLen)
+                                        {
+                                            ConnectResource.getAasxFileName = getaasxFile_fileName;
+                                            ConnectResource.getAasxFileData = getaasxFile_fileData;
+
+                                            ConnectResource.getAasxStatus = "end";
+                                            Console.WriteLine("Received: " + fileName);
+
+                                            getaasxFile_destination = "";
+                                            getaasxFile_fileName = "";
+                                            getaasxFile_fileLen = 0;
+                                        }
+                                    }
+                                    break;
                             }
                         }
                     }
@@ -466,7 +506,12 @@ namespace AasxRegistryStandardBib
                     }
                 }
 
-                Thread.Sleep(connectUpdateRate);
+                if (getaasxFile_destination != "") // block transfer
+                {
+                    Thread.Sleep(200);
+                }
+                else
+                    Thread.Sleep(connectUpdateRate);
             }
         }
 
@@ -543,9 +588,9 @@ namespace AasxRegistryStandardBib
 
             var serverSettings = new ServerSettings
             {
-                // Host = "localhost",
-                Host = "admin-shell-io.com",
-                Port = "52002",
+                Host = "localhost",
+                // Host = "admin-shell-io.com",
+                Port = "52001",
                 UseHttps = false
             };
             RestServer rs = new RestServer(serverSettings);
