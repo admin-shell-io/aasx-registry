@@ -344,7 +344,7 @@ namespace AasxRegistryStandardBib
 
         static string getaasxFile_destination = "";
         static string getaasxFile_fileName = "";
-        static string getaasxFile_fileData = "";
+        static SortedDictionary<int, string> getaasxFile_fileData = new SortedDictionary<int, string>();
         static int getaasxFile_fileLen = 0;
         static int getaasxFile_fileTransmitted = 0;
 
@@ -469,8 +469,7 @@ namespace AasxRegistryStandardBib
                                         string fileData = parsed3.SelectToken("fileData").Value<string>();
                                         int fileLen = parsed3.SelectToken("fileLen").Value<int>();
                                         int fileTransmitted = parsed3.SelectToken("fileTransmitted").Value<int>();
-                                        fileTransmitted += fileData.Length;
-                                        Console.WriteLine("Transmitted: " + fileTransmitted + "/" + fileLen);
+
 
                                         if (getaasxFile_destination == "") // first block
                                         {
@@ -478,18 +477,28 @@ namespace AasxRegistryStandardBib
                                             getaasxFile_fileName = fileName;
                                             getaasxFile_fileLen = fileLen;
                                         }
-                                        getaasxFile_fileData += fileData;
+                                        getaasxFile_fileData.Add(fileTransmitted, fileData);
+
+                                        fileTransmitted += fileData.Length;
+                                        Console.WriteLine("Transmitted: " + fileTransmitted + "/" + fileLen);
 
                                         if (fileTransmitted == fileLen)
                                         {
                                             ConnectResource.getAasxFileName = getaasxFile_fileName;
-                                            ConnectResource.getAasxFileData = getaasxFile_fileData;
+                                            ConnectResource.getAasxFileData = "";
+                                            foreach (var fd in getaasxFile_fileData)
+                                            {
+                                                Console.WriteLine("Copy data: " + fd.Key + "/" + fileLen);
+                                                ConnectResource.getAasxFileData += fd.Value;
+                                            }
 
                                             ConnectResource.getAasxStatus = "end";
-                                            Console.WriteLine("Received: " + fileName);
+                                            Console.WriteLine("Received: " + fileName + " " + fileTransmitted + " "
+                                                + ConnectResource.getAasxFileData.Length);
 
                                             getaasxFile_destination = "";
                                             getaasxFile_fileName = "";
+                                            getaasxFile_fileData.Clear();
                                             getaasxFile_fileLen = 0;
                                         }
                                     }
