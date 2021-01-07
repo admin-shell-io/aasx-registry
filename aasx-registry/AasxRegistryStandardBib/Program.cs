@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using AasxConnect;
 using Grapevine.Core.Interfaces.Server;
@@ -106,7 +107,7 @@ namespace AasxRegistryStandardBib
         [RestRoute(HttpMethod = Grapevine.Core.Shared.HttpMethod.GET, PathInfo = @"^/server/getaasx2/(\d+)(/|)$")]
         public IHttpContext GetAASX2(IHttpContext context)
         {
-            GetAasx(context);
+            GetAasx2(context);
             return context;
         }
 
@@ -115,7 +116,172 @@ namespace AasxRegistryStandardBib
         public static int getAasxServerIndex = 0;
         public static string getAasxFileName = "";
         public static string getAasxFileData = "";
+        public static string getAasxFileType = "";
+        public static int getAasxFileLenBase64 = 0;
+        public static int getAasxFileLenBinary = 0;
+        public static object aasxFileLock = new object();
 
+        public static string secretString = "Industrie4.0-Asset-Administration-Shell";
+
+        public static void GetAasx2(IHttpContext context, bool withStream = false)
+        {
+            string ret = "ERROR";
+            dynamic res = new ExpandoObject();
+
+            while (getAasxStatus != "") // earlier Download pending
+            {
+                System.Threading.Thread.Sleep(1000);
+            }
+            getAasxServerName = "";
+            getAasxServerIndex = 0;
+            getAasxFileName = "";
+            getAasxFileData = "";
+            getAasxFileLenBase64 = 0;
+            getAasxFileLenBinary = 0;
+
+            if (!withStream)
+            {
+                getAasxFileType = "getaasx";
+            }
+            else
+            {
+                getAasxFileType = "getaasxstream";
+            }
+
+            string path = context.Request.PathInfo;
+            string[] split = path.Split('/');
+            string node = split[2];
+            string aasIndex = split[3];
+
+            if (Program.aasDirectory.Count > 0)
+            {
+                int i = 0;
+
+                foreach (var server in Program.aasDirectory)
+                {
+                    foreach (var aas in server.aasList)
+                    {
+                        if (i++ == Convert.ToInt32(aasIndex))
+                        {
+                            getAasxServerName = server.source;
+                            getAasxServerIndex = aas.index;
+                        }
+                    }
+                }
+            }
+
+            if (getAasxServerName == "")
+                return;
+
+            getAasxStatus = "start";
+
+            if (!withStream)
+            {
+                while (getAasxStatus != "end") // wait for Download
+                {
+                    System.Threading.Thread.Sleep(1000);
+                }
+
+                getAasxStatus = "";
+
+                if (getAasxFileData == "")
+                    return;
+
+                res.fileName = getAasxFileName;
+                res.fileData = getAasxFileData;
+
+                string responseJson = JsonConvert.SerializeObject(res, Formatting.Indented);
+
+                context.Response.ContentType = ContentType.JSON;
+                context.Response.ContentEncoding = System.Text.Encoding.UTF8;
+                context.Response.ContentLength64 = responseJson.Length;
+                context.Response.SendResponse(responseJson);
+            }
+            else // send as stream
+            {
+                /*
+                while (getAasxStatus != "end") // wait for Download
+                {
+                    System.Threading.Thread.Sleep(1000);
+                }
+                */
+
+                while (getAasxFileName == "" || getAasxFileLenBase64 == 0) // Data
+                {
+                    System.Threading.Thread.Sleep(1000);
+                }
+
+                // Byte[] fileBytes4 = Convert.FromBase64String(getAasxFileData);
+
+                context.Response.SendChunked = true;
+                context.Response.ContentType = ContentType.APPLICATION;
+                context.Response.ContentLength64 = getAasxFileLenBinary;
+                if (getAasxFileName != null)
+                    context.Response.AddHeader("Content-Disposition", $"attachment; filename={getAasxFileName}");
+
+                int pos = 0;
+                int filePos = 0;
+                int len = 0;
+                Byte[] fileBytes;
+                int maxLen = 1500000; // must be multiple of 3 for BASE64 encoding
+                while (pos != getAasxFileLenBase64) // wait for blocks to send
+                {
+                    len = getAasxFileData.Length - pos;
+                    if (len > 0)
+                    {
+                        if (len > maxLen)
+                            len = maxLen;
+                        try
+                        {
+                            // 3 binary bytes are 4 BASE64 characters
+                            fileBytes = Convert.FromBase64String(getAasxFileData.Substring(pos, len));
+                            context.Response.Advanced.OutputStream.WriteAsync(fileBytes, 0, fileBytes.Length);
+                            Console.WriteLine("OutputStream pos=" + pos + " filePos=" + filePos + " len=" + fileBytes.Length + " total=" + getAasxFileLenBinary);
+                            pos += len;
+                            filePos += fileBytes.Length;
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("Error OutputStream");
+                            return;
+                        }
+                    }
+                    System.Threading.Thread.Sleep(100);
+                }
+
+                getAasxStatus = "";
+                context.Response.Advanced.Close();
+
+                /*
+                while (getAasxStatus != "end") // wait for Download
+                {
+                    System.Threading.Thread.Sleep(1000);
+                }
+
+                Byte[] fileBytes4 = Convert.FromBase64String(getAasxFileData);
+
+                context.Response.ContentType = ContentType.APPLICATION;
+                context.Response.ContentLength64 = fileBytes4.Length;
+                context.Response.SendChunked = true;
+
+                if (getAasxFileName != null)
+                    context.Response.AddHeader("Content-Disposition", $"attachment; filename={getAasxFileName}");
+
+                context.Response.Advanced.OutputStream.Write(fileBytes4, 0, fileBytes4.Length);
+                context.Response.Advanced.Close();
+                */
+            }
+        }
+
+        [RestRoute(HttpMethod = Grapevine.Core.Shared.HttpMethod.GET, PathInfo = @"^/server/getaasx/(\d+)(/|)$")]
+        public IHttpContext GetAASX(IHttpContext context)
+        {
+
+            GetAasx2(context, true);
+            return context;
+        }
+
+        /*
         public static void GetAasx(IHttpContext context)
         {
             string ret = "ERROR";
@@ -155,27 +321,37 @@ namespace AasxRegistryStandardBib
             if (getAasxServerName != "")
             {
                 getAasxStatus = "start";
-                while (getAasxStatus != "end") // wait for Download
+
+                while (getAasxFileName == "" || getAasxFileLen == 0) // Data
                 {
                     System.Threading.Thread.Sleep(1000);
                 }
 
+                context.Response.ContentType = ContentType.APPLICATION;
+                context.Response.ContentLength64 = getAasxFileLen;
+                context.Response.SendChunked = true;
+                if (getAasxFileName != null)
+                    context.Response.AddHeader("Content-Disposition", $"attachment; filename={getAasxFileName}");
+
+                int pos = 0;
+                int len = 0;
+                while (pos != getAasxFileLen) // wait for blocks to send
+                {
+                    len = getAasxFileData.Length - pos;
+                    if (len > 0)
+                    {
+                        Byte[] fileBytes = Convert.FromBase64String(getAasxFileData+pos);
+                        context.Response.Advanced.OutputStream.WriteAsync(fileBytes, 0, fileBytes.Length);
+                        pos += len;
+                    }
+                    System.Threading.Thread.Sleep(1000);
+                }
+
                 getAasxStatus = "";
+                context.Response.Advanced.Close();
             }
-
-            if (getAasxFileData != "")
-            {
-                res.fileName = getAasxFileName;
-                res.fileData = getAasxFileData;
-            }
-
-            string responseJson = JsonConvert.SerializeObject(res, Formatting.Indented);
-
-            context.Response.ContentType = ContentType.JSON;
-            context.Response.ContentEncoding = System.Text.Encoding.UTF8;
-            context.Response.ContentLength64 = responseJson.Length;
-            context.Response.SendResponse(responseJson);
         }
+        */
 
         [RestRoute(HttpMethod = Grapevine.Core.Shared.HttpMethod.GET, PathInfo = @"^/server/aasxbyasset/([^/]+)(/|)$")]
         public IHttpContext GetAASX2ByAssetId(IHttpContext context)
@@ -344,9 +520,10 @@ namespace AasxRegistryStandardBib
 
         static string getaasxFile_destination = "";
         static string getaasxFile_fileName = "";
-        static SortedDictionary<int, string> getaasxFile_fileData = new SortedDictionary<int, string>();
-        static int getaasxFile_fileLen = 0;
-        static int getaasxFile_fileTransmitted = 0;
+        public static SortedDictionary<int, string> getaasxFile_fileData = new SortedDictionary<int, string>();
+        static int getaasxFile_fileLenBase64 = 0;
+        static int getaasxFile_fileLenBinary = 0;
+        static int getaasxFile_copied = 0;
 
         public static void connectThreadLoop()
         {
@@ -366,7 +543,7 @@ namespace AasxRegistryStandardBib
                 if (ConnectResource.getAasxStatus == "start")
                 {
                     td.destination = ConnectResource.getAasxServerName;
-                    td.type = "getaasx";
+                    td.type = ConnectResource.getAasxFileType;
                     td.extensions = ConnectResource.getAasxServerIndex.ToString();
                     tf.data.Add(td);
                     ConnectResource.getAasxStatus = "send";
@@ -410,7 +587,7 @@ namespace AasxRegistryStandardBib
 
                 if (content != "")
                 {
-                    Console.WriteLine(count++ + " Received content");
+                    Console.Write(count++ + " Received content ");
                     newConnectData = false;
                     string node = "";
 
@@ -420,6 +597,7 @@ namespace AasxRegistryStandardBib
                         tf2 = Newtonsoft.Json.JsonConvert.DeserializeObject<Connect.TransmitFrame>(content);
 
                         node = tf2.source;
+                        Console.WriteLine(node);
                         foreach (Connect.TransmitData td2 in tf2.data)
                         {
                             switch (td2.type)
@@ -454,6 +632,7 @@ namespace AasxRegistryStandardBib
 
                                         ConnectResource.getAasxFileName = fileName;
                                         ConnectResource.getAasxFileData = fileData;
+                                        ConnectResource.getAasxFileLenBase64 = fileData.Length;
 
                                         ConnectResource.getAasxStatus = "end";
 
@@ -467,29 +646,53 @@ namespace AasxRegistryStandardBib
 
                                         string fileName = parsed3.SelectToken("fileName").Value<string>();
                                         string fileData = parsed3.SelectToken("fileData").Value<string>();
-                                        int fileLen = parsed3.SelectToken("fileLen").Value<int>();
+                                        int fileLenBase64 = parsed3.SelectToken("fileLenBase64").Value<int>();
+                                        int fileLenBinary = parsed3.SelectToken("fileLenBinary").Value<int>();
                                         int fileTransmitted = parsed3.SelectToken("fileTransmitted").Value<int>();
-
 
                                         if (getaasxFile_destination == "") // first block
                                         {
                                             getaasxFile_destination = connectNodeName;
                                             getaasxFile_fileName = fileName;
-                                            getaasxFile_fileLen = fileLen;
+                                            getaasxFile_fileLenBase64 = fileLenBase64;
+                                            getaasxFile_fileLenBinary = fileLenBinary;
+                                            ConnectResource.getAasxFileName = getaasxFile_fileName;
+                                            ConnectResource.getAasxFileData = "";
+                                            ConnectResource.getAasxFileLenBase64 = fileLenBase64;
+                                            ConnectResource.getAasxFileLenBinary = fileLenBinary;
                                         }
                                         getaasxFile_fileData.Add(fileTransmitted, fileData);
 
-                                        fileTransmitted += fileData.Length;
-                                        Console.WriteLine("Transmitted: " + fileTransmitted + "/" + fileLen);
-
-                                        if (fileTransmitted == fileLen)
+                                        //
+                                        bool copied = true;
+                                        while (copied)
                                         {
-                                            ConnectResource.getAasxFileName = getaasxFile_fileName;
-                                            ConnectResource.getAasxFileData = "";
+                                            copied = false;
                                             foreach (var fd in getaasxFile_fileData)
                                             {
-                                                Console.WriteLine("Copy data: " + fd.Key + "/" + fileLen);
-                                                ConnectResource.getAasxFileData += fd.Value;
+                                                if (getaasxFile_copied == fd.Key)
+                                                {
+                                                    copied = true;
+                                                    Console.WriteLine("Copy block: " + fd.Key + "/" + fd.Value.Length);
+                                                    ConnectResource.getAasxFileData += fd.Value;
+                                                    getaasxFile_copied += fd.Value.Length;
+                                                }
+                                            }
+                                        }
+                                        //
+
+                                        fileTransmitted += fileData.Length;
+                                        Console.WriteLine("Transmitted: " + fileTransmitted + "/" + fileLenBase64);
+
+                                        if (fileTransmitted == fileLenBase64)
+                                        {
+                                            foreach (var fd in getaasxFile_fileData)
+                                            {
+                                                if (getaasxFile_copied <= fd.Key)
+                                                {
+                                                    Console.WriteLine("Copy data: " + fd.Key + "/" + fileLenBase64);
+                                                    ConnectResource.getAasxFileData += fd.Value;
+                                                }
                                             }
 
                                             ConnectResource.getAasxStatus = "end";
@@ -499,7 +702,9 @@ namespace AasxRegistryStandardBib
                                             getaasxFile_destination = "";
                                             getaasxFile_fileName = "";
                                             getaasxFile_fileData.Clear();
-                                            getaasxFile_fileLen = 0;
+                                            getaasxFile_fileLenBase64 = 0;
+                                            getaasxFile_fileLenBinary = 0;
+                                            getaasxFile_copied = 0;
                                         }
                                     }
                                     break;
@@ -550,6 +755,7 @@ namespace AasxRegistryStandardBib
             // default command line options
             bool debugwait = false;
             Boolean help = false;
+            bool isLocalHost = false;
 
             int i = 0;
             while (i < args.Length)
@@ -567,6 +773,12 @@ namespace AasxRegistryStandardBib
                 if (x == "--help")
                 {
                     help = true;
+                    break;
+                }
+
+                if (x == "-localhost")
+                {
+                    isLocalHost = true;
                     break;
                 }
             }
@@ -595,10 +807,12 @@ namespace AasxRegistryStandardBib
 
             Console.WriteLine("Waiting for client on " + domainName);
 
+            string host = "admin-shell-io.com";
+            if (isLocalHost)
+                host = "localhost";
             var serverSettings = new ServerSettings
             {
-                // Host = "localhost",
-                Host = "admin-shell-io.com",
+                Host = host,
                 Port = "52001",
                 UseHttps = false
             };
