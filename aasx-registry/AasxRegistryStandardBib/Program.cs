@@ -215,6 +215,13 @@ namespace AasxRegistryStandardBib
 
                 context.Response.SendChunked = true;
                 context.Response.ContentType = ContentType.APPLICATION;
+
+                Byte[] fileBytes;
+                if (getAasxFileLenBinary == 0)
+                {
+                    fileBytes = Convert.FromBase64String(getAasxFileData);
+                    getAasxFileLenBinary = fileBytes.Length;
+                }
                 context.Response.ContentLength64 = getAasxFileLenBinary;
                 if (getAasxFileName != null)
                     context.Response.AddHeader("Content-Disposition", $"attachment; filename={getAasxFileName}");
@@ -222,7 +229,6 @@ namespace AasxRegistryStandardBib
                 int pos = 0;
                 int filePos = 0;
                 int len = 0;
-                Byte[] fileBytes;
                 int maxLen = 1500000; // must be multiple of 3 for BASE64 encoding
                 while (pos != getAasxFileLenBase64) // wait for blocks to send
                 {
@@ -634,7 +640,8 @@ namespace AasxRegistryStandardBib
                                         ConnectResource.getAasxFileData = fileData;
                                         ConnectResource.getAasxFileLenBase64 = fileData.Length;
 
-                                        ConnectResource.getAasxStatus = "end";
+                                        if (ConnectResource.getAasxStatus == "send")
+                                            ConnectResource.getAasxStatus = "end";
 
                                         Console.WriteLine("Received: " + fileName);
                                     }
